@@ -31,10 +31,8 @@ private:
     class result;
 
 public:
-    using sender_type = std::function<type::buffer (type::buffer)>;
-
-    client(sender_type sender)
-        : sender_{std::move(sender)}
+    client(type::executor executor)
+        : executor_{std::move(executor)}
     {
     }
 
@@ -56,7 +54,7 @@ public:
                 .pack(data)
                 .to_buffer();
 
-        auto buffer = sender_(std::move(request));
+        auto buffer = executor_(std::move(request));
         auto response = packer.from_buffer(std::move(buffer));
         decltype(meta) response_meta;
         response = response.unpack(response_meta);
@@ -70,7 +68,7 @@ private:
     using packer_type = TPacker;
     using deserializer_type = typename packer_type::deserializer_type;
 
-    sender_type sender_;
+    type::executor executor_;
 
     class result final
     {

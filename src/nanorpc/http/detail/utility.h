@@ -87,6 +87,28 @@ inline void handle_error(executor_data const &data, std::string const &message) 
     }
 }
 
+template <typename TEx, typename ... TMsg>
+inline void handle_error(core::type::error_handler const &error_handler, TMsg const & ... message_items) noexcept
+{
+    try
+    {
+        if (!error_handler)
+            return;
+
+        std::string message;
+        (message += ... += std::string{message_items});
+
+        // TODO:
+        std::cerr << "Message: " << message << std::endl;
+
+        auto exception = std::make_exception_ptr(TEx{std::move(message)});
+        error_handler(std::move(exception));
+    }
+    catch (...)
+    {
+    }
+}
+
 }   // namespace nanorpc::http::detail::utility
 
 #endif  // !__NANO_RPC_HTTP_DETAIL_UTILITY_H__

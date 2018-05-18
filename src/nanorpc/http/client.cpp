@@ -177,8 +177,7 @@ class client::impl final
     : public std::enable_shared_from_this<impl>
 {
 public:
-    impl(std::string_view host, std::string_view port, std::size_t workers, std::string_view location,
-            core::type::error_handler error_handler)
+    impl(std::string_view host, std::string_view port, std::size_t workers, core::type::error_handler error_handler)
         : error_handler_{std::move(error_handler)}
         , workers_count_{std::max<int>(1, workers)}
         , context_{workers_count_}
@@ -191,11 +190,32 @@ public:
             if (ec)
                 throw exception::client{"Failed to resolve endpoint \"" + std::string{host} + ":" + std::string{port} + "\""};
         }
+    }
 
-        auto executor = [this_ = this, dest_location = std::string{location}, host = boost::asio::ip::host_name()]
+    ~impl() noexcept
+    {
+        try
+        {
+            if (stopped())
+                return;
+
+            stop();
+        }
+        catch (std::exception const &e)
+        {
+            detail::utility::handle_error<exception::client>(error_handler_, "[nanorpc::client::impl::~impl] ", "Error: ", e.what());
+        }
+    }
+
+    void init_executor(std::string_view location)
+    {
+        auto executor = [this_ = std::weak_ptr{shared_from_this()}, dest_location = std::string{location}, host = boost::asio::ip::host_name()]
             (core::type::buffer request)
             {
-                auto self = this_->shared_from_this();
+                auto self = this_.lock();
+                if (!self)
+                    throw exception::client{"No owner object."};
+
                 session_ptr session;
                 core::type::buffer response;
                 try
@@ -229,21 +249,6 @@ public:
         executor_ = std::move(executor);
     }
 
-    ~impl() noexcept
-    {
-        try
-        {
-            if (stopped())
-                return;
-
-            stop();
-        }
-        catch (std::exception const &e)
-        {
-            detail::utility::handle_error<exception::client>(error_handler_, "[nanorpc::client::impl::~impl] ", "Error: ", e.what());
-        }
-    }
-
     void run()
     {
         if (!stopped())
@@ -255,7 +260,7 @@ public:
         for (auto i = workers_count_ ; i ; --i)
         {
             workers.emplace_back(
-                    [self = shared_from_this()]
+                    [self = this]
                     {
                         try
                         {
@@ -362,20 +367,14 @@ private:
 
 client::client(std::string_view host, std::string_view port, std::size_t workers, std::string_view location,
         core::type::error_handler error_handler)
-    : impl_{std::make_shared<impl>(std::move(host), std::move(port), workers, std::move(location), std::move(error_handler))}
+    : impl_{std::make_shared<impl>(std::move(host), std::move(port), workers, std::move(error_handler))}
 {
+    impl_->init_executor(std::move(location));
 }
 
 client::~client() noexcept
 {
-    try
-    {
-        if (!stopped())
-            stop();
-    }
-    catch (...)
-    {
-    }
+    impl_.reset();
 }
 
 void client::run()

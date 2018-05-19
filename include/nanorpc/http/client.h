@@ -9,11 +9,9 @@
 #define __NANO_RPC_HTTP_CLIENT_H__
 
 // STD
+#include <cstdint>
 #include <memory>
 #include <string>
-
-// STD
-#include <cstdint>
 
 // NANORPC
 #include "nanorpc/core/exception.h"

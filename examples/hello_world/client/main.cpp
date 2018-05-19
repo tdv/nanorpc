@@ -1,25 +1,24 @@
+//-------------------------------------------------------------------
+//  Nano RPC
+//  https://github.com/tdv/nanorpc
+//  Created:     05.2018
+//  Copyright (C) 2018 tdv
+//-------------------------------------------------------------------
+
+// STD
 #include <iostream>
 
-#include <nanorpc/packer/plain_text.h>
-#include <nanorpc/core/client.h>
-#include <nanorpc/http/client.h>
-
-#include <thread>
-#include <chrono>
+// NANORPC
+#include <nanorpc/http/easy.h>
 
 int main()
 {
     try
     {
-        nanorpc::http::client http_client{"localhost", "55555", 8, "/api/"};
-        http_client.run();
+        auto client = nanorpc::http::easy::make_client("localhost", "55555", 8, "/api/");
 
-        std::cout << "Client started." << std::endl;
-
-        nanorpc::core::client<nanorpc::packer::plain_text> client(http_client.get_executor());
-
-        std::string from_server = client.call("test", std::string{"test"});
-        std::cout << "Response from server: " << from_server << std::endl;
+        std::string result = client.call("test", std::string{"test"});
+        std::cout << "Response from server: " << result << std::endl;
 
         std::cout << "Press Enter for quit." << std::endl;
 

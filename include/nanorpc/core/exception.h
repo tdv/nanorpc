@@ -29,9 +29,9 @@
 namespace nanorpc::core::exception
 {
 
-NANORPC_EXCEPTION_DECL(exception, std::runtime_error)
-NANORPC_EXCEPTION_DECL(logic, exception)
-NANORPC_EXCEPTION_DECL(transport, exception)
+NANORPC_EXCEPTION_DECL(nanorpc, std::runtime_error)
+NANORPC_EXCEPTION_DECL(logic, nanorpc)
+NANORPC_EXCEPTION_DECL(transport, nanorpc)
 NANORPC_EXCEPTION_DECL(client, transport)
 NANORPC_EXCEPTION_DECL(server, transport)
 

@@ -16,24 +16,23 @@
 
 // BOOST
 #include <boost/asio.hpp>
+#include <boost/core/ignore_unused.hpp>
 
-// THIS
-#include "data.h"
-
-// TODO: remove it
-#include <iostream>
+// NANORPC
+#include "nanorpc/core/exception.h"
+#include "nanorpc/core/type.h"
 
 namespace nanorpc::http::detail::utility
 {
 
 template <typename T>
 inline std::enable_if_t<std::is_invocable_v<T>, void>
-post(boost::asio::io_context &context, T func) noexcept
+post(boost::asio::io_context &context, T func, core::type::error_handler error_handler = {}) noexcept
 {
     try
     {
         boost::asio::post(context,
-                [callable = std::move(func)]
+                [callable = std::move(func), error_handler]
                 {
                     try
                     {
@@ -41,49 +40,28 @@ post(boost::asio::io_context &context, T func) noexcept
                     }
                     catch (std::exception const &e)
                     {
-                        // TODO:
-                        std::cerr << "Failed to call method. Error: " << e.what() <<  std::endl;
+                        try
+                        {
+                            if (error_handler)
+                                error_handler(std::make_exception_ptr(e));
+                        }
+                        catch (...)
+                        {
+                        }
                     }
                 }
             );
     }
     catch (std::exception const &e)
     {
-        // TODO:
-        std::cerr << "Failed to post task. Error: " << e.what() << std::endl;
-    }
-}
-
-inline void handle_error(executor_data const &data, std::exception_ptr exception) noexcept
-{
-    try
-    {
-        if (data.error_handler_)
-            data.error_handler_(std::move(exception));
-    }
-    catch (...)
-    {
-    }
-
-    // TODO:
-    try
-    {
-        std::rethrow_exception(exception);
-    }
-    catch (std::exception const &e)
-    {
-        std::cerr << "Error: " << e.what() << std::endl;
-    }
-}
-
-inline void handle_error(executor_data const &data, std::string const &message) noexcept
-{
-    try
-    {
-        handle_error(data, std::make_exception_ptr(std::runtime_error{message}));
-    }
-    catch (...)
-    {
+        try
+        {
+            if (error_handler)
+                error_handler(std::make_exception_ptr(e));
+        }
+        catch (...)
+        {
+        }
     }
 }
 
@@ -96,17 +74,46 @@ inline void handle_error(core::type::error_handler const &error_handler, TMsg co
             return;
 
         std::string message;
-        (message += ... += std::string{message_items});
-
-        // TODO:
-        std::cerr << "Message: " << message << std::endl;
-
+        boost::ignore_unused((message += ... += std::string{message_items}));
         auto exception = std::make_exception_ptr(TEx{std::move(message)});
         error_handler(std::move(exception));
     }
     catch (...)
     {
     }
+}
+
+template <typename TEx, typename ... TMsg>
+inline void handle_error(core::type::error_handler const &error_handler, std::exception_ptr nested, TMsg const & ... message_items) noexcept
+{
+    handle_error<TEx>(error_handler, message_items ... );
+
+    if (!nested)
+        return;
+
+    try
+    {
+        try
+        {
+            std::rethrow_exception(nested);
+        }
+        catch (std::exception const &e)
+        {
+            handle_error<TEx>(error_handler, e.what());
+        }
+
+        std::rethrow_if_nested(nested);
+    }
+    catch (...)
+    {
+        handle_error<core::exception::nanorpc>(error_handler, std::current_exception());
+    }
+}
+
+template <typename TEx, typename ... TMsg>
+inline void handle_error(core::type::error_handler const &error_handler, std::exception const &e, TMsg const & ... message_items) noexcept
+{
+    handle_error<TEx>(error_handler, std::make_exception_ptr(e), message_items ... );
 }
 
 }   // namespace nanorpc::http::detail::utility

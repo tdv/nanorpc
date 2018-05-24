@@ -14,9 +14,15 @@
 #include <string>
 #include <utility>
 
+// BOOST
+#include <boost/core/ignore_unused.hpp>
+
 // NANORPC
 #include "nanorpc/core/client.h"
+#include "nanorpc/core/server.h"
+#include "nanorpc/core/type.h"
 #include "nanorpc/http/client.h"
+#include "nanorpc/http/server.h"
 #include "nanorpc/packer/plain_text.h"
 
 namespace nanorpc::http::easy
@@ -33,6 +39,28 @@ make_client(std::string_view host, std::string_view port, std::size_t workers, s
                 return executor(std::move(request));
             };
     return {std::move(executor_proxy)};
+}
+
+template <typename ... T>
+inline server make_server(std::string_view address, std::string_view port, std::size_t workers,
+                          std::string_view location, std::pair<char const *, T> const & ... handlers)
+{
+    auto core_server = std::make_shared<core::server<packer::plain_text>>();
+    boost::ignore_unused(((core_server->handle(handlers.first, handlers.second), ... ), 0));
+
+    auto executor = [srv = std::move(core_server)]
+            (core::type::buffer request)
+            {
+                return srv->execute(std::move(request));
+            };
+
+    core::type::executor_map executors;
+    executors.emplace(std::move(location), std::move(executor));
+
+    server http_server(std::move(address), std::move(port), workers, std::move(executors));
+    http_server.run();
+
+    return http_server;
 }
 
 

@@ -19,10 +19,6 @@ int main()
 
         std::string result = client.call("test", std::string{"test"});
         std::cout << "Response from server: " << result << std::endl;
-
-        std::cout << "Press Enter for quit." << std::endl;
-
-        std::cin.get();
     }
     catch (std::exception const &e)
     {

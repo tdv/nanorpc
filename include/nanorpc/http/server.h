@@ -14,10 +14,13 @@
 #include <string>
 
 // NANORPC
+#include "nanorpc/core/exception.h"
 #include <nanorpc/core/type.h>
 
 namespace nanorpc::http
 {
+
+NANORPC_EXCEPTION_DECL_WITH_NAMESPACE(exception, server, core::exception::server)
 
 class server final
 {

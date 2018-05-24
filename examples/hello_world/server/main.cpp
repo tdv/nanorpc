@@ -1,8 +1,14 @@
+//-------------------------------------------------------------------
+//  Nano RPC
+//  https://github.com/tdv/nanorpc
+//  Created:     05.2018
+//  Copyright (C) 2018 tdv
+//-------------------------------------------------------------------
+
+// STD
 #include <iostream>
 
-#include <nanorpc/packer/plain_text.h>
-#include <nanorpc/core/server.h>
-#include <nanorpc/http/server.h>
+// NANORPC
 #include <nanorpc/http/easy.h>
 
 int main()

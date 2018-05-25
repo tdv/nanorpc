@@ -1,4 +1,4 @@
-# nanorpc - Nano RPC is a lightweight RPC in pure C++ 17
+# nanorpc - lightweight RPC in pure C++ 17
 Nano RPC is a lightweight RPC in C++ 17 with support for user-defined data structures, without code generation and without macros, only pure C++ with HTTP transport. If you need SSL, you can use nginx as frontend. Nano RPC is a very light library.  
 
 # Version

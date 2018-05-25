@@ -14,9 +14,6 @@
 #include <string>
 #include <utility>
 
-// BOOST
-#include <boost/core/ignore_unused.hpp>
-
 // NANORPC
 #include "nanorpc/core/client.h"
 #include "nanorpc/core/server.h"
@@ -46,7 +43,7 @@ inline server make_server(std::string_view address, std::string_view port, std::
                           std::string_view location, std::pair<char const *, T> const & ... handlers)
 {
     auto core_server = std::make_shared<core::server<packer::plain_text>>();
-    boost::ignore_unused(((core_server->handle(handlers.first, handlers.second), ... ), 0));
+    (core_server->handle(handlers.first, handlers.second), ... );
 
     auto executor = [srv = std::move(core_server)]
             (core::type::buffer request)

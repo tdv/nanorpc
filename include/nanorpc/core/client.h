@@ -18,6 +18,8 @@
 #include <utility>
 
 // NANORPC
+#include "nanorpc/core/detail/pack_meta.h"
+#include "nanorpc/core/exception.h"
 #include "nanorpc/core/type.h"
 #include "nanorpc/version/core.h"
 
@@ -45,21 +47,46 @@ public:
     template <typename ... TArgs>
     result call(type::id id, TArgs && ... args)
     {
-        auto meta = std::make_tuple(version::core::protocol::value, std::move(id));
         auto data = std::make_tuple(std::forward<TArgs>(args) ... );
 
         packer_type packer;
         auto request = packer
-                .pack(meta)
+                .pack(version::core::protocol::value)
+                .pack(detail::pack::meta::type::request)
+                .pack(id)
                 .pack(data)
                 .to_buffer();
 
         auto buffer = executor_(std::move(request));
         auto response = packer.from_buffer(std::move(buffer));
-        decltype(meta) response_meta;
-        response = response.unpack(response_meta);
-        if (meta != response_meta)
-            throw std::runtime_error{"[" + std::string{__func__ } + "] The meta in the response is bad."};
+
+        {
+            version::core::protocol::value_type protocol{};
+            response = response.unpack(protocol);
+            if (protocol != version::core::protocol::value)
+            {
+                throw exception::client{"[nanorpc::core::client::call] Unsupported protocol version \"" +
+                        std::to_string(protocol) + "\"."};
+            }
+        }
+
+        {
+            detail::pack::meta::type type{};
+            response = response.unpack(type);
+            if (type != detail::pack::meta::type::response)
+                throw exception::client{"[nanorpc::core::client::call] Bad response type."};
+        }
+
+        {
+            detail::pack::meta::status status{};
+            response = response.unpack(status);
+            if (status != detail::pack::meta::status::good)
+            {
+                std::string message;
+                response = response.unpack(message);
+                throw exception::logic{message};
+            }
+        }
 
         return {std::move(response)};
     }
@@ -81,14 +108,14 @@ private:
         T as() const
         {
             if (!value_ && !deserializer_)
-                throw std::runtime_error{"[" + std::string{__func__ } + "] No data."};
+                throw exception::client{"[nanorpc::core::client::result::as] No data."};
 
             using Type = std::decay_t<T>;
 
             if (!value_)
             {
                  if (!deserializer_)
-                     throw std::runtime_error{"[" + std::string{__func__ } + "] No data."};
+                     throw exception::client{"[nanorpc::core::client::result::as] No data."};
 
                  Type data{};
                  deserializer_->unpack(data);

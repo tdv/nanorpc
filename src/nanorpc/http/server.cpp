@@ -305,7 +305,7 @@ private:
         try
         {
             acceptor_.async_accept(socket_,
-                    [self = shared_from_this()] (boost::system::error_code const &ec)
+                    [self = this] (boost::system::error_code const &ec)
                     {
                         try
                         {
@@ -391,7 +391,7 @@ public:
         for (auto i = workers_count_ ; i ; --i)
         {
             workers.emplace_back(
-                    [self = shared_from_this()]
+                    [self = this]
                     {
                         try
                         {
@@ -409,7 +409,7 @@ public:
                 );
         }
 
-        std::exchange(listener, listener_);
+        listener_ = std::move(listener);
         workers_ = std::move(workers);
     }
 

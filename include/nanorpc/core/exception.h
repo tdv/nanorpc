@@ -10,6 +10,7 @@
 
 // STD
 #include <stdexcept>
+#include <string>
 
 #define NANORPC_EXCEPTION_DECL(class_, base_) \
     class class_ \
@@ -30,10 +31,29 @@ namespace nanorpc::core::exception
 {
 
 NANORPC_EXCEPTION_DECL(nanorpc, std::runtime_error)
+NANORPC_EXCEPTION_DECL(packer, nanorpc)
 NANORPC_EXCEPTION_DECL(logic, nanorpc)
 NANORPC_EXCEPTION_DECL(transport, nanorpc)
 NANORPC_EXCEPTION_DECL(client, transport)
 NANORPC_EXCEPTION_DECL(server, transport)
+
+inline std::string to_string(std::exception const &e)
+{
+    std::string message = e.what();
+
+    try
+    {
+        std::rethrow_if_nested(e);
+    }
+    catch (std::exception const &ex)
+    {
+        message += "\n";
+        message += "\t";
+        message += to_string(ex);
+    }
+
+    return message;
+}
 
 }   // namespace nanorpc::core::exception
 

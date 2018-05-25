@@ -11,6 +11,7 @@
 // STD
 #include <cassert>
 #include <cstdint>
+#include <iomanip>
 #include <istream>
 #include <iterator>
 #include <memory>
@@ -29,6 +30,7 @@
 #include <boost/iostreams/stream.hpp>
 
 // NANORPC
+#include "nanorpc/core/exception.h"
 #include "nanorpc/core/type.h"
 #include "nanorpc/packer/detail/to_tuple.h"
 #include "nanorpc/packer/detail/traits.h"
@@ -70,7 +72,7 @@ private:
         {
             assert(stream_ && "Empty stream.");
             if (!stream_)
-                throw std::runtime_error{"[" + std::string{__func__ } + "] Empty stream."};
+                throw core::exception::packer{"[nanorpc::packer::plain_text::serializer::pack] Empty stream."};
 
             pack_value(value);
             return std::move(*this);
@@ -80,7 +82,7 @@ private:
         {
             assert(stream_ && "Empty stream.");
             if (!stream_)
-                throw std::runtime_error{"[" + std::string{__func__ } + "] Empty stream."};
+                throw core::exception::packer{"[nanorpc::packer::plain_text::serializer::to_buffer] Empty stream."};
 
             stream_.reset();
             auto tmp = std::move(*buffer_);
@@ -107,13 +109,33 @@ private:
                 decltype(*static_cast<std::ostream *>(nullptr) << value, std::declval<std::true_type>());
         static constexpr std::false_type is_serializable(...) noexcept;
         template <typename T>
-        static constexpr bool is_serializable_v = std::decay_t<decltype(is_serializable(*static_cast<T *>(nullptr)))>::value;
+        static constexpr bool is_serializable_v = std::decay_t<decltype(is_serializable(*static_cast<T *>(nullptr)))>::value &&
+                !std::is_same_v<T, std::string_view>;
+
+        void pack_value(char const *value)
+        {
+            pack_value(std::string{value});
+        }
 
         template <typename T>
-        std::enable_if_t<is_serializable_v<T> , void>
+        std::enable_if_t<is_serializable_v<T> && !std::is_same_v<std::decay_t<T>, std::string>, void>
         pack_value(T const &value)
         {
             *stream_ << value << ' ';
+        }
+
+        template <typename T>
+        std::enable_if_t<is_serializable_v<T> && std::is_same_v<std::decay_t<T>, std::string>, void>
+        pack_value(T const &value)
+        {
+            *stream_ << std::quoted(value) << ' ';
+        }
+
+        template <typename T>
+        std::enable_if_t<!is_serializable_v<T> && std::is_enum_v<T>, void>
+        pack_value(T value)
+        {
+            pack_value(static_cast<std::underlying_type_t<std::decay_t<T>>>(value));
         }
 
         template <typename T>
@@ -180,7 +202,7 @@ private:
         {
             assert(stream_ && "Empty stream.");
             if (!stream_)
-                throw std::runtime_error{"[" + std::string{__func__ } + "] Empty stream."};
+                throw core::exception::packer{"[nanorpc::packer::plain_text::deserializer] Empty stream."};
 
             unpack_value(value);
             return std::move(*this);
@@ -212,14 +234,30 @@ private:
                 decltype(*static_cast<std::istream *>(nullptr) >> value, std::declval<std::true_type>());
         static constexpr std::false_type is_deserializable(...) noexcept;
         template <typename T>
-        static constexpr bool is_deserializable_v = std::decay_t<decltype(is_deserializable(*static_cast<std::decay_t<T> *>(nullptr)))>::value;
+        static constexpr bool is_deserializable_v = std::decay_t<decltype(is_deserializable(*static_cast<std::decay_t<T> *>(nullptr)))>::value &&
+                !std::is_same_v<T, std::string_view>;
 
         template <typename T>
-        std::enable_if_t<is_deserializable_v<T> , void>
+        std::enable_if_t<is_deserializable_v<T> && !std::is_same_v<T, std::string>, void>
         unpack_value(T &value)
         {
-            (void)value;
             *stream_ >> value;
+        }
+
+        template <typename T>
+        std::enable_if_t<is_deserializable_v<T> && std::is_same_v<T, std::string>, void>
+        unpack_value(T &value)
+        {
+            *stream_ >> std::quoted(value);
+        }
+
+        template <typename T>
+        std::enable_if_t<!is_deserializable_v<T> && std::is_enum_v<T>, void>
+        unpack_value(T &value)
+        {
+            std::underlying_type_t<std::decay_t<T>> enum_value{};
+            unpack_value(enum_value);
+            value = static_cast<std::decay_t<T>>(enum_value);
         }
 
         template <typename T>

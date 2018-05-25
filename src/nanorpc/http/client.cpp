@@ -55,7 +55,7 @@ public:
                         {
                             if (ec)
                             {
-                                auto exception = exception::client{"Failed to connect to remote host. Error: " + ec.message()};
+                                auto exception = exception::client{"Failed to connect to remote host. " + ec.message()};
                                 promise.set_exception(std::make_exception_ptr(std::move(exception)));
                                 return;
                             }
@@ -81,15 +81,17 @@ public:
                 if (ec)
                 {
                     utility::handle_error<exception::client>(self->error_handler_,
+                            std::make_exception_ptr(exception::client{ec.message()}),
                             "[nanorpc::http::detail::client::session::close] ",
-                            "Failed to shutdown session. ", "Error: ", ec.message());
+                            "Failed to shutdown session.");
                 }
                 self->socket_.close(ec);
                 if (ec)
                 {
                     utility::handle_error<exception::client>(self->error_handler_,
+                            std::make_exception_ptr(exception::client{ec.message()}),
                             "[nanorpc::http::detail::client::session::close] ",
-                            "Failed to close session. ", "Error: ", ec.message());
+                            "Failed to close session.");
                 }
             };
 
@@ -126,7 +128,7 @@ public:
                             boost::ignore_unused(bytes);
                             if (ec)
                             {
-                                auto exception = exception::client{"Failed to receive response. Error: " + ec.message()};
+                                auto exception = exception::client{"Failed to receive response. " + ec.message()};
                                 promise->set_exception(std::make_exception_ptr(std::move(exception)));
                                 self->close();
                                 return;
@@ -148,7 +150,7 @@ public:
                             boost::ignore_unused(bytes);
                             if (ec)
                             {
-                                auto exception = exception::client{"Failed to post request. Error: " + ec.message()};
+                                auto exception = exception::client{"Failed to post request. " + ec.message()};
                                 promise->set_exception(std::make_exception_ptr(std::move(exception)));
                                 self->close();
                                 return;
@@ -203,7 +205,8 @@ public:
         }
         catch (std::exception const &e)
         {
-            detail::utility::handle_error<exception::client>(error_handler_, "[nanorpc::client::impl::~impl] ", "Error: ", e.what());
+            detail::utility::handle_error<exception::client>(error_handler_, e,
+                    "[nanorpc::client::impl::~impl] Failed to done.");
         }
     }
 
@@ -227,8 +230,8 @@ public:
                     }
                     catch (exception::client const &e)
                     {
-                        detail::utility::handle_error<exception::client>(self->error_handler_,
-                                "[nanorpc::client::impl::executor] Failed to execute request. ", "Error: ", e.what(), " Try again ...");
+                        detail::utility::handle_error<exception::client>(self->error_handler_, std::exception{e},
+                                "[nanorpc::client::impl::executor] Failed to execute request. Try again ...");
 
                         session = self->get_session();
                         response = session->send(std::move(request), dest_location, host);
@@ -268,8 +271,8 @@ public:
                         }
                         catch (std::exception const &e)
                         {
-                            detail::utility::handle_error<exception::client>(self->error_handler_,
-                                    "[nanorpc::client::impl::run] ", "Error: ", e.what());
+                            detail::utility::handle_error<exception::client>(self->error_handler_, e,
+                                    "[nanorpc::client::impl::run] Failed to run.");
                             std::exit(EXIT_FAILURE);
                         }
                     }
@@ -295,8 +298,8 @@ public:
                     }
                     catch (std::exception const &e)
                     {
-                        detail::utility::handle_error<exception::client>(error_handler_,
-                                "[nanorpc::client::impl::stop] ", "Error: ", e.what());
+                        detail::utility::handle_error<exception::client>(error_handler_, e,
+                                "[nanorpc::client::impl::stop] Failed to stop.");
                         std::exit(EXIT_FAILURE);
                     }
                 }

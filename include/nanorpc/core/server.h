@@ -16,11 +16,10 @@
 #include <tuple>
 #include <utility>
 
-// BOOST
-#include <boost/core/ignore_unused.hpp>
-
 // NANORPC
 #include "nanorpc/core/detail/function_meta.h"
+#include "nanorpc/core/detail/pack_meta.h"
+#include "nanorpc/core/exception.h"
 #include "nanorpc/core/type.h"
 #include "nanorpc/version/core.h"
 
@@ -60,35 +59,64 @@ public:
     }
 
     type::buffer execute(type::buffer buffer)
+    try
     {
         if (handlers_.empty())
-            throw std::runtime_error{"[" + std::string{__func__ } + "] No handlers."};
+            throw exception::server{"[nanorpc::core::server::execute] No handlers."};
 
         packer_type packer;
 
-        using meta_type = std::tuple<version::core::protocol::value_type, type::id>;
-        meta_type meta;
-        auto request = packer.from_buffer(std::move(buffer)).unpack(meta);
+        auto request = packer.from_buffer(std::move(buffer));
 
-        auto const protocol_version = std::get<0>(meta);
-        if (protocol_version != version::core::protocol::value)
         {
-            throw std::runtime_error{"[" + std::string{__func__ } + "] Failed to process data. "
-                    "Protocol \"" + std::to_string(protocol_version) + "\" not supported."};
+            version::core::protocol::value_type protocol{};
+            request = request.unpack(protocol);
+            if (protocol != version::core::protocol::value)
+            {
+                throw exception::server{"[nanorpc::core::server::execute] Unsupported protocol version \"" +
+                        std::to_string(protocol) + "\"."};
+            }
         }
 
-        auto const function_id = std::get<1>(meta);
+        {
+            detail::pack::meta::type type{};
+            request = request.unpack(type);
+            if (type != detail::pack::meta::type::request)
+                throw exception::server{"[nanorpc::core::server::execute] Bad response type."};
+        }
+
+        type::id function_id{};
+        request = request.unpack(function_id);
+
+        auto response = packer
+                .pack(version::core::protocol::value)
+                .pack(detail::pack::meta::type::response);
+
         auto const iter = handlers_.find(function_id);
         if (iter == end(handlers_))
+            throw exception::server{"[nanorpc::core::server::execute] Function not found."};
+
+        try
         {
-            throw std::runtime_error{"[" + std::string{__func__ } + "] Function with id "
-                    "\"" + std::to_string(function_id) + "\" not found."};
+            iter->second(request, response);
+        }
+        catch (std::exception const &e)
+        {
+            response = response
+                    .pack(detail::pack::meta::status::fail)
+                    .pack(e.what());
         }
 
-        auto response = packer.pack(meta);
-        iter->second(request, response);
-
         return response.to_buffer();
+    }
+    catch (std::exception const &e)
+    {
+        return packer_type{}
+                .pack(version::core::protocol::value)
+                .pack(detail::pack::meta::type::response)
+                .pack(detail::pack::meta::status::fail)
+                .pack(e.what())
+                .to_buffer();
     }
 
 private:
@@ -106,6 +134,7 @@ private:
     apply(TFunc func, TArgs args, serializer_type &serializer)
     {
         auto data = std::apply(std::move(func), std::move(args));
+        serializer = serializer.pack(detail::pack::meta::status::good);
         serializer = serializer.pack(data);
     }
 
@@ -114,8 +143,8 @@ private:
     std::enable_if_t<std::is_same_v<std::decay_t<decltype(std::apply(std::declval<TFunc>(), std::declval<TArgs>()))>, void>, void>
     apply(TFunc func, TArgs args, serializer_type &serializer)
     {
-        boost::ignore_unused(serializer);
         std::apply(std::move(func), std::move(args));
+        serializer = serializer.pack(detail::pack::meta::status::good);
     }
 };
 

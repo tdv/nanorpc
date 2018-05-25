@@ -6,6 +6,7 @@
 //-------------------------------------------------------------------
 
 // STD
+#include <cstdlib>
 #include <iostream>
 
 // NANORPC
@@ -22,7 +23,7 @@ int main()
     }
     catch (std::exception const &e)
     {
-        std::cerr << "Error: " << e.what() << std::endl;
+        std::cerr << "Error: " << nanorpc::core::exception::to_string(e) << std::endl;
         return EXIT_FAILURE;
     }
 

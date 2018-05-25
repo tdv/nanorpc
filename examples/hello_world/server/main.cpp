@@ -6,6 +6,7 @@
 //-------------------------------------------------------------------
 
 // STD
+#include <cstdlib>
 #include <iostream>
 
 // NANORPC
@@ -16,7 +17,7 @@ int main()
     try
     {
         auto server = nanorpc::http::easy::make_server("0.0.0.0", "55555", 8, "/api/",
-                std::pair{"test", [] (std::string const &s) { std::cout << "Param: " << s << std::endl; return std::string{"tested"}; } }
+                std::pair{"test", [] (std::string const &s) { return "Tested: " + s; } }
             );
 
         std::cout << "Press Enter for quit." << std::endl;

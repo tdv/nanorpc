@@ -252,7 +252,6 @@ int main()
 // STD
 #include <cstdlib>
 #include <iostream>
-#include <mutex>
 
 // NANORPC
 #include <nanorpc/http/easy.h>
@@ -264,55 +263,65 @@ int main()
 {
     try
     {
-        std::mutex mutex;
-        data::employees employees;
+        auto client = nanorpc::http::easy::make_client("localhost", "55555", 8, "/api/");
 
-        auto server = nanorpc::http::easy::make_server("0.0.0.0", "55555", 8, "/api/",
-                std::pair{"create", [&]
-                    (std::string const &id, data::employee const &employee)
-                    {
-                        std::lock_guard loxk{mutex};
-                        if (employees.find(id) != std::end(employees))
-                            throw std::invalid_argument{"Employee with id \"" + id + "\" already exists."};
-                        employees.emplace(id, employee);
-                        return id;
-                    } },
-                std::pair{"read", [&]
-                    (std::string const &id)
-                    {
-                        std::lock_guard loxk{mutex};
-                        auto const iter = employees.find(id);
-                        if (iter == std::end(employees))
-                            throw std::invalid_argument{"Employee with id \"" + id + "\" not found."};
-                        return iter->second;
-                    } },
-                std::pair{"update", [&]
-                    (std::string const &id, data::employee const &employee)
-                    {
-                        std::lock_guard loxk{mutex};
-                        auto iter = employees.find(id);
-                        if (iter == std::end(employees))
-                            throw std::invalid_argument{"Employee with id \"" + id + "\" not found."};
-                        iter->second = employee;
-                    } },
-                std::pair{"delete", [&]
-                    (std::string const &id)
-                    {
-                        std::lock_guard loxk{mutex};
-                        auto iter = employees.find(id);
-                        if (iter == std::end(employees))
-                            throw std::invalid_argument{"Employee with id \"" + id + "\" not found."};
-                        employees.erase(iter);
-                    } }
-            );
+        std::string employee_id = "employee_1";
 
-        std::cout << "Press Enter for quit." << std::endl;
+        {
+            data::employee employee;
 
-        std::cin.get();
+            employee.name = "John";
+            employee.last_name = "Brown";
+            employee.age = 33;
+            employee.company = "Google";    // Johns dreams
+            employee.occupation = data::occupation_type::developer;
+            employee.job.push_back({"Task 1", "Do something."});
+            employee.job.push_back({"Task 2", "Do something more."});
+
+            employee_id = client.call("create", employee_id, employee).as<std::string>();
+            std::cout << "added employee with id \"" << employee_id << "\"." << std::endl;
+        }
+
+        auto show_employee_info = [] (data::employee const &employee)
+            {
+                std::cout << "name: " << employee.name << std::endl;
+                std::cout << "last_name: " << employee.last_name << std::endl;
+                std::cout << "age: " << employee.age << std::endl;
+                std::cout << "company: " << employee.company << std::endl;
+                std::cout << "occupation: "
+                          << (employee.occupation == data::occupation_type::developer ? "developer" : "manager")
+                          << std::endl;
+                for (auto const &task : employee.job)
+                {
+                    std::cout << "\ttask name: " << task.name << std::endl;
+                    std::cout << "\ttask description: " << task.description << std::endl;
+                }
+            };
+
+        data::employee employee = client.call("read", employee_id);
+
+        std::cout << "about employee with id \"" << employee_id << "\"" << std::endl;
+        show_employee_info(employee);
+
+        employee.occupation = data::occupation_type::manager;
+
+        client.call("update", employee_id, employee);
+        std::cout << "the employee has been promoted ..." << std::endl;
+
+        employee = client.call("read", employee_id).as<data::employee>();
+
+        std::cout << "new info about employee with id \"" << employee_id << "\"" << std::endl;
+        show_employee_info(employee);
+
+        client.call("delete", employee_id);
+        std::cout << "the employee has been fired ..." << std::endl;
+
+        std::cout << "you can't fire an employee twice" << std::endl;
+        client.call("delete", employee_id);
     }
     catch (std::exception const &e)
     {
-        std::cerr << "Error: " << e.what() << std::endl;
+        std::cerr << "Error: " << nanorpc::core::exception::to_string(e) << std::endl;
         return EXIT_FAILURE;
     }
 

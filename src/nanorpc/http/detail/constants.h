@@ -12,7 +12,10 @@ namespace nanorpc::http::detail::constants
 {
 
 inline constexpr auto server_name = "Nano RPC server";
+inline constexpr auto user_agent_name = "Nano RPC user agent";
 inline constexpr auto content_type = "text/html";
+
+inline constexpr auto http_version = 11;
 
 }   // namespace nanorpc::http::detail::constants
 

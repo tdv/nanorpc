@@ -9,6 +9,7 @@
 #define __NANO_RPC_CORE_EXCEPTION_H__
 
 // STD
+#include <iostream>
 #include <stdexcept>
 #include <string>
 
@@ -53,6 +54,21 @@ inline std::string to_string(std::exception const &e)
     }
 
     return message;
+}
+
+inline void default_error_handler(std::exception_ptr e)
+{
+    if (!e)
+        return;
+
+    try
+    {
+        std::rethrow_exception(e);
+    }
+    catch (std::exception const &ex)
+    {
+        std::cerr << "NanoRPC exception message: " << to_string(ex) << std::endl;
+    }
 }
 
 }   // namespace nanorpc::core::exception

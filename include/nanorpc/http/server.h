@@ -26,7 +26,8 @@ class server final
 {
 public:
     server(std::string_view address, std::string_view port, std::size_t workers,
-           core::type::executor_map executors, core::type::error_handler error_handler = {});
+           core::type::executor_map executors,
+           core::type::error_handler error_handler = core::exception::default_error_handler);
 
     ~server() noexcept;
     void run();

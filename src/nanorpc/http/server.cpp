@@ -311,10 +311,13 @@ private:
                         {
                             if (ec)
                             {
-                                utility::handle_error<exception::server>(self->error_handler_,
-                                        std::make_exception_ptr(std::runtime_error{ec.message()}),
-                                        "[nanorpc::http::detail::listener::accept] ",
-                                        "Failed to accept connection.");
+                                if (ec != boost::asio::error::operation_aborted)
+                                {
+                                    utility::handle_error<exception::server>(self->error_handler_,
+                                            std::make_exception_ptr(std::runtime_error{ec.message()}),
+                                            "[nanorpc::http::detail::listener::accept] ",
+                                            "Failed to accept connection.");
+                                }
                             }
                             else
                             {

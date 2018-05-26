@@ -25,8 +25,8 @@ NANORPC_EXCEPTION_DECL_WITH_NAMESPACE(exception, client, core::exception::client
 class client final
 {
 public:
-    client(std::string_view host, std::string_view port, std::size_t workers,
-            std::string_view location, core::type::error_handler error_handler = {});
+    client(std::string_view host, std::string_view port, std::size_t workers, std::string_view location,
+            core::type::error_handler error_handler = core::exception::default_error_handler);
 
     ~client() noexcept;
     void run();

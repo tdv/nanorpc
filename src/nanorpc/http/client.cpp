@@ -25,6 +25,7 @@
 #include "nanorpc/http/client.h"
 
 // THIS
+#include "detail/constants.h"
 #include "detail/utility.h"
 
 namespace nanorpc::http
@@ -105,13 +106,13 @@ public:
         request->keep_alive(true);
         request->body().assign(begin(buffer), end(buffer));
 
-        request->version(11);
+        request->version(constants::http_version);
         request->method(boost::beast::http::verb::post);
         request->target(location);
         request->set(boost::beast::http::field::host, host);
-        request->set(boost::beast::http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+        request->set(boost::beast::http::field::user_agent, constants::user_agent_name);
         request->set(boost::beast::http::field::content_length, buffer.size());
-        request->set(boost::beast::http::field::content_type, "text/html");
+        request->set(boost::beast::http::field::content_type, constants::content_type);
         request->set(boost::beast::http::field::keep_alive, request->keep_alive());
 
         auto promise = std::make_shared<std::promise<core::type::buffer>>();

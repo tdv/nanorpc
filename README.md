@@ -20,7 +20,7 @@ Currently, C++ reflection is not supported out of the box, so this library has s
 ## Restrictions
 - user-defined data structures should not have a user-defined constructor
 - no inheritance
-- you can not use all types from stl and boost
+- you can't use arbitrary types from stl and boost
 - you can't use raw pointers and non-const references  
 
 # Compiler

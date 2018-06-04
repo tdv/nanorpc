@@ -22,6 +22,20 @@
 #include <type_traits>
 #include <utility>
 
+// NANORPC
+#include "nanorpc/core/detail/config.h"
+#include "nanorpc/core/exception.h"
+#include "nanorpc/core/type.h"
+#include "nanorpc/packer/detail/to_tuple.h"
+#include "nanorpc/packer/detail/traits.h"
+
+#ifdef NANORPC_PURE_CORE
+
+// STD
+#include <sstream>
+
+#else
+
 // BOOST
 #include <boost/core/ignore_unused.hpp>
 #include <boost/iostreams/device/array.hpp>
@@ -29,11 +43,7 @@
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/stream.hpp>
 
-// NANORPC
-#include "nanorpc/core/exception.h"
-#include "nanorpc/core/type.h"
-#include "nanorpc/packer/detail/to_tuple.h"
-#include "nanorpc/packer/detail/traits.h"
+#endif  // !NANORPC_PURE_CORE
 
 namespace nanorpc::packer
 {
@@ -84,19 +94,32 @@ private:
             if (!stream_)
                 throw core::exception::packer{"[nanorpc::packer::plain_text::serializer::to_buffer] Empty stream."};
 
+#ifndef NANORPC_PURE_CORE
             stream_.reset();
             auto tmp = std::move(*buffer_);
             buffer_.reset();
             return tmp;
+#else
+            auto str = std::move(stream_->str());
+            return {begin(str), end(str)};
+#endif  // !NANORPC_PURE_CORE
         }
 
     private:
+#ifndef NANORPC_PURE_CORE
         using buffer_ptr = std::unique_ptr<core::type::buffer>;
         using stream_type = boost::iostreams::filtering_ostream;
+#else
+        using stream_type = std::stringstream;
+#endif  // !NANORPC_PURE_CORE
         using stream_type_ptr = std::unique_ptr<stream_type>;
 
+#ifndef NANORPC_PURE_CORE
         buffer_ptr buffer_{std::make_unique<core::type::buffer>()};
         stream_type_ptr stream_{std::make_unique<stream_type>(boost::iostreams::back_inserter(*buffer_))};
+#else
+        stream_type_ptr stream_{std::make_unique<std::stringstream>()};
+#endif  // !NANORPC_PURE_CORE
 
         friend class plain_text;
         serializer() = default;
@@ -185,7 +208,11 @@ private:
                     pack_value(value);
                     *stream_ << ' ';
                 };
+#ifndef NANORPC_PURE_CORE
             boost::ignore_unused(pack_tuple_item);
+#else
+            (void)pack_tuple_item;
+#endif  // !NANORPC_PURE_CORE
             (pack_tuple_item(std::get<I>(tuple)) , ... );
         }
     };
@@ -209,25 +236,41 @@ private:
         }
 
     private:
+#ifndef NANORPC_PURE_CORE
         using buffer_ptr = std::unique_ptr<core::type::buffer>;
         using source_type = boost::iostreams::basic_array_source<char>;
-        using source_type_ptr = std::unique_ptr<source_type>;
         using stream_type = boost::iostreams::stream<source_type>;
+        using source_type_ptr = std::unique_ptr<source_type>;
+#else
+        using stream_type = std::stringstream;
+#endif  // !NANORPC_PURE_CORE
+
         using stream_type_ptr = std::unique_ptr<stream_type>;
 
+#ifndef NANORPC_PURE_CORE
         buffer_ptr buffer_;
         source_type_ptr source_{std::make_unique<source_type>(!buffer_->empty() ? buffer_->data() : nullptr, buffer_->size())};
         stream_type_ptr stream_{std::make_unique<stream_type>(*source_)};
+#else
+        stream_type_ptr stream_{std::make_unique<stream_type>()};
+#endif  // !NANORPC_PURE_CORE
 
         friend class plain_text;
 
         deserializer(deserializer const &) = delete;
         deserializer& operator = (deserializer const &) = delete;
 
+#ifndef NANORPC_PURE_CORE
         deserializer(core::type::buffer buffer)
             : buffer_{std::make_unique<core::type::buffer>(std::move(buffer))}
         {
         }
+#else
+        deserializer(core::type::buffer buffer)
+            : stream_{std::make_unique<stream_type>(std::string{begin(buffer), end(buffer)})}
+        {
+        }
+#endif  // !NANORPC_PURE_CORE
 
         template <typename T>
         static constexpr auto is_deserializable(T &value) noexcept ->

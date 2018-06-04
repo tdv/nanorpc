@@ -8,6 +8,10 @@
 #ifndef __NANO_RPC_HTTPS_CLIENT_H__
 #define __NANO_RPC_HTTPS_CLIENT_H__
 
+// NANORPC
+#include "nanorpc/core/detail/config.h"
+#if !defined(NANORPC_PURE_CORE) && defined(NANORPC_WITH_SSL)
+
 // STD
 #include <cstdint>
 #include <memory>
@@ -19,8 +23,6 @@
 // NANORPC
 #include "nanorpc/core/exception.h"
 #include "nanorpc/core/type.h"
-
-namespace nanorpc::http::detail { class client_impl; }
 
 namespace nanorpc::https
 {
@@ -42,10 +44,11 @@ public:
     core::type::executor const& get_executor() const;
 
 private:
-    std::shared_ptr<http::detail::client_impl> impl_;
+    class impl;
+    std::shared_ptr<impl> impl_;
 };
 
 }   // namespace nanorpc::https
 
-
+#endif  // !NANORPC_WITH_SSL
 #endif  // !__NANO_RPC_HTTPS_CLIENT_H__

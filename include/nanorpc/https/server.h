@@ -8,6 +8,10 @@
 #ifndef __NANO_RPC_HTTPS_SERVER_H__
 #define __NANO_RPC_HTTPS_SERVER_H__
 
+// NANORPC
+#include "nanorpc/core/detail/config.h"
+#if !defined(NANORPC_PURE_CORE) && defined(NANORPC_WITH_SSL)
+
 // STD
 #include <cstdint>
 #include <memory>
@@ -19,8 +23,6 @@
 // NANORPC
 #include "nanorpc/core/exception.h"
 #include <nanorpc/core/type.h>
-
-namespace nanorpc::http::detail { class server_impl; }
 
 namespace nanorpc::https
 {
@@ -40,10 +42,11 @@ public:
     bool stopped() const noexcept;
 
 private:
-    std::shared_ptr<http::detail::server_impl> impl_;
+    class impl;
+    std::shared_ptr<impl> impl_;
 };
 
 }   // namespace nanorpc::https
 
-
+#endif  // !NANORPC_WITH_SSL
 #endif  // !__NANO_RPC_HTTPS_SERVER_H__

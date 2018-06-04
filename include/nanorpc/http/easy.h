@@ -8,6 +8,10 @@
 #ifndef __NANO_RPC_HTTP_EASY_H__
 #define __NANO_RPC_HTTP_EASY_H__
 
+// NANORPC
+#include "nanorpc/core/detail/config.h"
+#ifndef NANORPC_PURE_CORE
+
 // STD
 #include <cstdint>
 #include <memory>
@@ -63,5 +67,5 @@ inline server make_server(std::string_view address, std::string_view port, std::
 
 }   // namespace nanorpc::http::easy
 
-
+#endif  // !NANORPC_PURE_CORE
 #endif  // !__NANO_RPC_HTTP_EASY_H__

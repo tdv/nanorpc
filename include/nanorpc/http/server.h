@@ -8,6 +8,10 @@
 #ifndef __NANO_RPC_HTTP_SERVER_H__
 #define __NANO_RPC_HTTP_SERVER_H__
 
+// NANORPC
+#include "nanorpc/core/detail/config.h"
+#ifndef NANORPC_PURE_CORE
+
 // STD
 #include <cstdint>
 #include <memory>
@@ -19,8 +23,6 @@
 
 namespace nanorpc::http
 {
-
-namespace detail { class server_impl; }
 
 NANORPC_EXCEPTION_DECL_WITH_NAMESPACE(exception, server, core::exception::server)
 
@@ -37,10 +39,11 @@ public:
     bool stopped() const noexcept;
 
 private:
-    std::shared_ptr<detail::server_impl> impl_;
+    class impl;
+    std::shared_ptr<impl> impl_;
 };
 
 }   // namespace nanorpc::http
 
-
+#endif  // !NANORPC_PURE_CORE
 #endif  // !__NANO_RPC_HTTP_SERVER_H__

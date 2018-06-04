@@ -19,12 +19,21 @@
 
 // BOOST
 #include <boost/asio.hpp>
-#include <boost/asio/ssl.hpp>
 #include <boost/beast.hpp>
 
 // NANORPC
+#include "nanorpc/core/detail/config.h"
 #include "nanorpc/http/client.h"
+
+#ifdef NANORPC_WITH_SSL
+
+// BOOST
+#include <boost/asio/ssl.hpp>
+
+// NANORPC
 #include "nanorpc/https/client.h"
+
+#endif  // !NANORPC_WITH_SSL
 
 // THIS
 #include "detail/constants.h"
@@ -37,120 +46,66 @@ namespace detail
 namespace
 {
 
-class session final
+class session
     : public std::enable_shared_from_this<session>
 {
 public:
-    using ssl_context_ptr = std::shared_ptr<boost::asio::ssl::context>;
-
-    session(ssl_context_ptr ssl_context, boost::asio::ip::tcp::socket socket,
-            core::type::error_handler const &error_handler)
-        : socket_{std::move(socket)}
-        , ssl_context_{std::move(ssl_context)}
+    session(boost::asio::io_context &context, core::type::error_handler const &error_handler)
+        : context_{context}
         , error_handler_{error_handler}
     {
-        if (ssl_context_)
-            ssl_stream_ = std::make_unique<ssl_stream_type>(socket_, *ssl_context_);
     }
 
-    auto connect(boost::asio::ip::tcp::resolver::results_type const &endpoints_)
+    virtual ~session() noexcept = default;
+
+    void connect(boost::asio::ip::tcp::resolver::results_type const &endpoints)
     {
-        std::promise<std::shared_ptr<session>> promise;
+        std::promise<bool> promise;
 
-        auto connect = [self = shared_from_this(), &promise, &endpoints_]
+        auto on_connect = [&promise]
+            (boost::system::error_code const &ec)
             {
-                auto do_connect = [&] (auto &source)
-                    {
-                        boost::asio::async_connect(source, std::begin(endpoints_), std::end(endpoints_),
-                                [self, &promise] (boost::system::error_code const &ec, auto)
-                                {
-                                    if (ec)
-                                    {
-                                        auto exception = exception::client{"Failed to connect to remote host. " + ec.message()};
-                                        promise.set_exception(std::make_exception_ptr(std::move(exception)));
-                                        return;
-                                    }
-
-                                    promise.set_value(std::move(self));
-                                }
-                            );
-                    };
-
-                if (!self->ssl_stream_)
-                    do_connect(self->socket_);
+                if (!ec)
+                {
+                    promise.set_value(true);
+                }
                 else
-                    do_connect(self->ssl_stream_->next_layer());
+                {
+                    auto exception = exception::client{"Failed to connect to remote host. " + ec.message()};
+                    promise.set_exception(std::make_exception_ptr(std::move(exception)));
+                }
             };
 
-        utility::post(socket_.get_io_context(), std::move(connect));
+        utility::post(context_,
+                [&] { connect(endpoints, std::move(on_connect)); } );
 
-        auto self = promise.get_future().get();;
-
-        if (ssl_stream_)
-        {
-            std::promise<std::shared_ptr<session>> promise;
-
-            ssl_stream_->async_handshake(boost::asio::ssl::stream_base::client,
-                    [self, &promise] (boost::system::error_code const &ec)
-                    {
-                        if (ec)
-                        {
-                            utility::handle_error<exception::client>(self->error_handler_,
-                                    std::make_exception_ptr(std::runtime_error{ec.message()}),
-                                    "[nanorpc::http::detail::client::session::run] ",
-                                    "Failed to do handshake.");
-
-                            self->close();
-
-                            return;
-                        }
-
-                        promise.set_value(std::move(self));
-                    });
-
-            self = promise.get_future().get();;
-        }
-
-        return self;
+        promise.get_future().get();;
     }
 
     void close() noexcept
     {
         auto close_connection = [self = shared_from_this()]
             {
-                if (!self->socket_.is_open())
-                    return;
                 boost::system::error_code ec;
-                if (!self->ssl_stream_)
-                    self->socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
-                else
-                    self->ssl_stream_->shutdown(ec);
-                if (ec)
-                {
-                    utility::handle_error<exception::client>(self->error_handler_,
-                            std::make_exception_ptr(exception::client{ec.message()}),
-                            "[nanorpc::http::detail::client::session::close] ",
-                            "Failed to shutdown session.");
-                }
-                self->socket_.close(ec);
-                if (ec)
-                {
-                    utility::handle_error<exception::client>(self->error_handler_,
-                            std::make_exception_ptr(exception::client{ec.message()}),
-                            "[nanorpc::http::detail::client::session::close] ",
-                            "Failed to close session.");
-                }
+                self->close(ec);
+                if (!ec)
+                    return;
+                utility::handle_error<exception::client>(self->error_handler_,
+                        std::make_exception_ptr(exception::client{ec.message()}),
+                        "[nanorpc::http::detail::client::session::close] ",
+                        "Failed to close session.");
             };
 
-        utility::post(socket_.get_io_context(), std::move(close_connection));
+        utility::post(context_, std::move(close_connection));
     }
 
     core::type::buffer send(core::type::buffer const &buffer, std::string const &location, std::string const &host)
     {
-        auto request = std::make_shared<boost::beast::http::request<boost::beast::http::string_body>>();
+        auto request = std::make_shared<request_type>();
 
         request->keep_alive(true);
         request->body().assign(begin(buffer), end(buffer));
+        request->prepare_payload();
 
         request->version(constants::http_version);
         request->method(boost::beast::http::verb::post);
@@ -161,112 +116,150 @@ public:
         request->set(boost::beast::http::field::content_type, constants::content_type);
         request->set(boost::beast::http::field::keep_alive, request->keep_alive());
 
+        auto self = shared_from_this();
+
         auto promise = std::make_shared<std::promise<core::type::buffer>>();
 
-        auto receive_response = [self = shared_from_this(), promise]
+        auto receive_response = [self, promise]
             {
-                auto buffer = std::make_shared<boost::beast::flat_buffer>();
-                auto response = std::make_shared<boost::beast::http::response<boost::beast::http::string_body>>();
+                auto buffer = std::make_shared<buffer_type>();
+                auto response = std::make_shared<response_type>();
 
-                auto do_read = [&] (auto &source)
-                    {
-                        boost::beast::http::async_read(source, *buffer, *response,
-                                [self, promise, buffer, response]
-                                (boost::system::error_code const &ec, std::size_t bytes)
-                                {
-                                    boost::ignore_unused(bytes);
-                                    if (ec)
-                                    {
-                                        auto exception = exception::client{"Failed to receive response. " + ec.message()};
-                                        promise->set_exception(std::make_exception_ptr(std::move(exception)));
-                                        self->close();
-                                        return;
-                                    }
+                self->read(buffer, response, [self, promise, response]
+                        (boost::system::error_code const &ec)
+                        {
+                            if (ec == boost::asio::error::operation_aborted)
+                                return;
 
-                                    auto const &content = response->body();
-                                    promise->set_value({begin(content), end(content)});
-                                }
-                            );
-                    };
+                            if (ec)
+                            {
+                                auto exception = exception::client{"Failed to receive response. " + ec.message()};
+                                promise->set_exception(std::make_exception_ptr(std::move(exception)));
+                                self->close();
+                                return;
+                            }
 
-                if (!self->ssl_stream_)
-                    do_read(self->socket_);
-                else
-                    do_read(*self->ssl_stream_);
+                            auto const &content = response->body();
+                            promise->set_value({begin(content), end(content)});
+                        }
+                    );
             };
 
 
-        auto post_request = [self = shared_from_this(), promise, request, recv = std::move(receive_response)]
-            {
-                auto do_write = [&] (auto &source)
+        self->write(request, [self, promise, receive = std::move(receive_response)]
+                (boost::system::error_code const &ec)
+                {
+                    if (ec == boost::asio::error::operation_aborted)
+                        return;
+
+                    if (!ec)
                     {
-                        boost::beast::http::async_write(source, *request,
-                                [self, promise, receive = std::move(recv)]
-                                (boost::system::error_code const &ec, std::size_t bytes)
-                                {
-                                    boost::ignore_unused(bytes);
-                                    if (ec)
-                                    {
-                                        auto exception = exception::client{"Failed to post request. " + ec.message()};
-                                        promise->set_exception(std::make_exception_ptr(std::move(exception)));
-                                        self->close();
-                                        return;
-                                    }
+                        utility::post(self->context_, std::move(receive));
+                    }
+                    else
+                    {
+                        auto exception = exception::client{"Failed to post request. " + ec.message()};
+                        promise->set_exception(std::make_exception_ptr(std::move(exception)));
+                        self->close();
+                    }
+                }
+            );
 
-                                    utility::post(self->socket_.get_io_context(), std::move(receive));
-                                }
-                            );
-                    };
+        return promise->get_future().get();
+    }
 
-                if (!self->ssl_stream_)
-                    do_write(self->socket_);
-                else
-                    do_write(*self->ssl_stream_);
-            };
+protected:
+    using request_type = boost::beast::http::request<boost::beast::http::string_body>;
+    using request_ptr = std::shared_ptr<request_type>;
 
-        utility::post(socket_.get_io_context(), std::move(post_request));
+    using buffer_type = boost::beast::flat_buffer;
+    using buffer_ptr = std::shared_ptr<buffer_type>;
 
-        return std::move(promise->get_future().get());
+    using response_type = boost::beast::http::response<boost::beast::http::string_body>;
+    using response_ptr = std::shared_ptr<response_type>;
+
+private:
+    boost::asio::io_context &context_;
+    core::type::error_handler const &error_handler_;
+
+    virtual void connect(boost::asio::ip::tcp::resolver::results_type const &endpoints,
+            std::function<void (boost::system::error_code const &)> on_connect) = 0;
+    virtual void close(boost::system::error_code &ec) = 0;
+    virtual void write(request_ptr request, std::function<void (boost::system::error_code const &)> on_write) = 0;
+    virtual void read(buffer_ptr buffer, response_ptr response,
+            std::function<void (boost::system::error_code const &)> on_read) = 0;
+};
+
+template <typename TBase, typename TSocket>
+class session_base
+    : public TBase
+{
+public:
+    template <typename ... TArgs>
+    session_base(core::type::error_handler const &error_handler,
+            boost::asio::io_context &io_context, TArgs && ... args)
+        : session{io_context, error_handler}
+        , socket_{io_context, std::forward<TArgs>(args) ... }
+    {
+    }
+
+protected:
+    using base_type = TBase;
+    using socket_type = TSocket;
+
+    socket_type & get_socket()
+    {
+        return socket_;
     }
 
 private:
-    using ssl_stream_type = boost::asio::ssl::stream<boost::asio::ip::tcp::socket &>;
+    socket_type socket_;
 
-    boost::asio::ip::tcp::socket socket_;
-    std::unique_ptr<ssl_stream_type> ssl_stream_;
-    ssl_context_ptr ssl_context_;
-    core::type::error_handler const &error_handler_;
+    virtual void write(typename base_type::request_ptr request,
+            std::function<void (boost::system::error_code const &)> on_write) override final
+    {
+        boost::beast::http::async_write(socket_, *request,
+                [func = std::move(on_write), request]
+                (boost::system::error_code const &ec, std::size_t bytes)
+                {
+                    boost::ignore_unused(bytes);
+                    func(ec);
+                }
+            );
+    }
+
+    virtual void read(typename base_type::buffer_ptr buffer, typename base_type::response_ptr response,
+            std::function<void (boost::system::error_code const &)> on_read) override final
+    {
+        boost::beast::http::async_read(socket_, *buffer, *response,
+                [func = std::move(on_read), buffer, response]
+                (boost::system::error_code const &ec, std::size_t bytes)
+                {
+                    boost::ignore_unused(bytes);
+                    func(ec);
+                }
+            );
+    }
 };
 
-}   // namespace
-
-class client_impl final
-    : public std::enable_shared_from_this<client_impl>
+class client
+    : public std::enable_shared_from_this<client>
 {
 public:
-    client_impl(std::string_view host, std::string_view port, std::size_t workers, core::type::error_handler error_handler)
+    client(std::string_view host, std::string_view port, std::size_t workers, core::type::error_handler error_handler)
         : error_handler_{std::move(error_handler)}
         , workers_count_{std::max<int>(1, workers)}
         , context_{workers_count_}
         , work_guard_{boost::asio::make_work_guard(context_)}
     {
-        {
-            boost::system::error_code ec;
-            boost::asio::ip::tcp::resolver resolver{context_};
-            endpoints_ = resolver.resolve(host, port, ec);
-            if (ec)
-                throw exception::client{"Failed to resolve endpoint \"" + std::string{host} + ":" + std::string{port} + "\""};
-        }
+        boost::system::error_code ec;
+        boost::asio::ip::tcp::resolver resolver{context_};
+        endpoints_ = resolver.resolve(host, port, ec);
+        if (ec)
+            throw exception::client{"Failed to resolve endpoint \"" + std::string{host} + ":" + std::string{port} + "\""};
     }
 
-    client_impl(session::ssl_context_ptr ssl_context, std::string_view host, std::string_view port,
-            std::size_t workers, core::type::error_handler error_handler)
-        : client_impl{std::move(host), std::move(port), workers, std::move(error_handler)}
-    {
-        ssl_context_ = std::move(ssl_context);
-    }
-
-    ~client_impl() noexcept
+    virtual ~client() noexcept
     {
         try
         {
@@ -278,7 +271,7 @@ public:
         catch (std::exception const &e)
         {
             utility::handle_error<exception::client>(error_handler_, e,
-                    "[nanorpc::client::~client_impl] Failed to done.");
+                    "[nanorpc::http::detail::client::~client] Failed to done.");
         }
     }
 
@@ -303,7 +296,7 @@ public:
                     catch (exception::client const &e)
                     {
                         utility::handle_error<exception::client>(self->error_handler_, std::exception{e},
-                                "[nanorpc::client_impl::executor] Failed to execute request. Try again ...");
+                                "[nanorpc::client::executor] Failed to execute request. Try again ...");
 
                         session = self->get_session();
                         response = session->send(std::move(request), dest_location, host);
@@ -315,7 +308,7 @@ public:
                     if (session)
                         session->close();
 
-                    auto exception = exception::client{"[nanorpc::client_impl::executor] Failed to send data."};
+                    auto exception = exception::client{"[nanorpc::client::executor] Failed to send data."};
                     std::throw_with_nested(std::move(exception));
                 }
                 return response;
@@ -344,7 +337,7 @@ public:
                         catch (std::exception const &e)
                         {
                             utility::handle_error<exception::client>(self->error_handler_, e,
-                                    "[nanorpc::client_impl::run] Failed to run.");
+                                    "[nanorpc::client::run] Failed to run.");
                             std::exit(EXIT_FAILURE);
                         }
                     }
@@ -371,7 +364,7 @@ public:
                     catch (std::exception const &e)
                     {
                         utility::handle_error<exception::client>(error_handler_, e,
-                                "[nanorpc::client_impl::stop] Failed to stop.");
+                                "[nanorpc::client::stop] Failed to stop.");
                         std::exit(EXIT_FAILURE);
                     }
                 }
@@ -390,13 +383,13 @@ public:
         return executor_;
     }
 
-private:
+protected:
     using session_ptr = std::shared_ptr<session>;
+
+private:
     using session_queue_type = std::queue<session_ptr>;
 
     using threads_type = std::vector<std::thread>;
-
-    session::ssl_context_ptr ssl_context_;
 
     core::type::executor executor_;
 
@@ -410,6 +403,9 @@ private:
     session_queue_type session_queue_;
 
     threads_type workers_;
+
+    virtual session_ptr make_session(boost::asio::io_context &io_context,
+            core::type::error_handler const &error_handler) = 0;
 
     session_ptr get_session()
     {
@@ -428,9 +424,8 @@ private:
         {
             if (stopped())
                 throw exception::client{"Failed to get session. The client was not started."};
-            boost::asio::ip::tcp::socket socket{context_};
-            std::exchange(session_item, std::make_shared<session>(ssl_context_, std::move(socket),
-                    error_handler_)->connect(endpoints_));
+            session_item = make_session(context_, error_handler_);
+            session_item->connect(endpoints_);
         }
 
         return session_item;
@@ -443,11 +438,58 @@ private:
     }
 };
 
+}   // namespace
 }   // namespace detail
+
+class client::impl final
+    : public detail::client
+{
+public:
+    using detail::client::client;
+
+private:
+    virtual session_ptr make_session(boost::asio::io_context &io_context,
+            core::type::error_handler const &error_handler) override final
+    {
+        return std::make_shared<session>(io_context, error_handler);
+    }
+
+    class session
+        : public detail::session_base<detail::session, boost::asio::ip::tcp::socket>
+    {
+    public:
+        session(boost::asio::io_context &io_context, core::type::error_handler const &error_handler)
+            : session_base{error_handler, io_context}
+        {
+        }
+
+    private:
+        virtual void connect(boost::asio::ip::tcp::resolver::results_type const &endpoints,
+                std::function<void (boost::system::error_code const &)> on_connect) override final
+        {
+            boost::asio::async_connect(get_socket(), std::begin(endpoints), std::end(endpoints),
+                    [func = std::move(on_connect)] (boost::system::error_code const &ec, auto)
+                    {
+                        func(ec);
+                    }
+                );
+        }
+
+        virtual void close(boost::system::error_code &ec) override final
+        {
+            if (!get_socket().is_open())
+                return;
+            get_socket().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
+            if (ec)
+                return;
+            get_socket().close(ec);
+        }
+    };
+};
 
 client::client(std::string_view host, std::string_view port, std::size_t workers, std::string_view location,
         core::type::error_handler error_handler)
-    : impl_{std::make_shared<detail::client_impl>(std::move(host), std::move(port), workers, std::move(error_handler))}
+    : impl_{std::make_shared<impl>(std::move(host), std::move(port), workers, std::move(error_handler))}
 {
     impl_->init_executor(std::move(location));
 }
@@ -479,13 +521,83 @@ core::type::executor const& client::get_executor() const
 
 }   // namespace nanorpc::http
 
+#ifdef NANORPC_WITH_SSL
+
 namespace nanorpc::https
 {
 
+class client::impl
+    : public http::detail::client
+{
+public:
+    impl(boost::asio::ssl::context ssl_context, std::string_view host, std::string_view port,
+            std::size_t workers, core::type::error_handler error_handler)
+        : http::detail::client{std::move(host), std::move(port), workers, std::move(error_handler)}
+        , ssl_context_{std::move(ssl_context)}
+    {
+    }
+
+private:
+    boost::asio::ssl::context ssl_context_;
+
+    virtual session_ptr make_session(boost::asio::io_context &io_context,
+            core::type::error_handler const &error_handler) override final
+    {
+        return std::make_shared<session>(io_context, ssl_context_, error_handler);
+    }
+
+    class session
+        : public http::detail::session_base<http::detail::session, boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>
+    {
+    public:
+        session(boost::asio::io_context &io_context, boost::asio::ssl::context &ssl_context,
+                core::type::error_handler const &error_handler)
+            : session_base{error_handler, io_context, static_cast<boost::asio::ssl::context &>(ssl_context)}
+        {
+        }
+
+    private:
+        virtual void connect(boost::asio::ip::tcp::resolver::results_type const &endpoints,
+                std::function<void (boost::system::error_code const &)> on_connect) override final
+        {
+            boost::asio::async_connect(get_socket().next_layer(), std::begin(endpoints), std::end(endpoints),
+                    [this, func = std::move(on_connect)] (boost::system::error_code const &ec, auto)
+                    {
+                        std::promise<bool> promise;
+
+                        get_socket().async_handshake(boost::asio::ssl::stream_base::client,
+                                [&promise] (boost::system::error_code const &ec)
+                                {
+                                    if (ec)
+                                    {
+                                        auto exception = exception::client{"Failed to do handshake. " + ec.message()};
+                                        promise.set_exception(std::make_exception_ptr(std::move(exception)));
+                                        return;
+                                    }
+
+                                    promise.set_value(true);
+                                });
+
+                        promise.get_future().get();
+                        func(ec);
+                    }
+                );
+        }
+
+        virtual void close(boost::system::error_code &ec) override final
+        {
+            boost::ignore_unused(ec);
+            if (!get_socket().next_layer().is_open())
+                return;
+            get_socket().async_shutdown([] (boost::system::error_code const &ec)
+                    { boost::ignore_unused(ec); } );
+        }
+    };
+};
+
 client::client(boost::asio::ssl::context context, std::string_view host, std::string_view port, std::size_t workers,
             std::string_view location, core::type::error_handler error_handler)
-    : impl_{std::make_shared<http::detail::client_impl>(std::make_shared<boost::asio::ssl::context>(std::move(context)),
-            std::move(host), std::move(port), workers, std::move(error_handler))}
+    : impl_{std::make_shared<impl>(std::move(context), std::move(host), std::move(port), workers, std::move(error_handler))}
 {
     impl_->init_executor(std::move(location));
 }
@@ -516,3 +628,5 @@ core::type::executor const& client::get_executor() const
 }
 
 }   // namespace nanorpc::https
+
+#endif  // !NANORPC_WITH_SSL

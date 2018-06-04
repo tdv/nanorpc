@@ -8,6 +8,10 @@
 #ifndef __NANO_RPC_HTTPS_EASY_H__
 #define __NANO_RPC_HTTPS_EASY_H__
 
+// NANORPC
+#include "nanorpc/core/detail/config.h"
+#if !defined(NANORPC_PURE_CORE) && defined(NANORPC_WITH_SSL)
+
 // STD
 #include <cstdint>
 #include <memory>
@@ -68,5 +72,5 @@ inline server make_server(boost::asio::ssl::context context, std::string_view ad
 
 }   // namespace nanorpc::https::easy
 
-
+#endif  // !NANORPC_WITH_SSL
 #endif  // !__NANO_RPC_HTTPS_EASY_H__

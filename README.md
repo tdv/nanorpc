@@ -351,7 +351,7 @@ int main()
 
 ```
 
-## RPC. Pure Core
+## Pure Core
 [Source code](https://github.com/tdv/nanorpc/tree/master/examples/pure_core)  
 **Description**  
 The "Pure Core" example demonstrates a basic client-server application with RPC and in-memory (in one process) communication. In this example 'executor' is a transport stub and you can rewrite it with your own transport implementation.  

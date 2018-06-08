@@ -60,6 +60,7 @@ cd nanorpc
 NanoRPC has two build options  
 - with SSL  
 - pure core only  
+
 Use cmake -D with NANORPC_WITH_SSL or NANORPC_PURE_CORE. You can't enable both options at the same time.  
 The 'pure core' build you can use with your own transport.  
 

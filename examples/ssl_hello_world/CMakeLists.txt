@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
 
-project(complex_type)
+project(ssl_hello_world)
 
 include (../common/cmake/client_server.cmake)

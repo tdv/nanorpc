@@ -1,8 +1,8 @@
 # nanorpc - lightweight RPC in pure C++ 17
-Nano RPC is a lightweight RPC in C++ 17 with support for user-defined data structures, without code generation and without macros, only pure C++ with HTTP transport. If you need SSL, you can use nginx as frontend. Nano RPC is a very light library.  
+Nano RPC is a lightweight RPC in C++ 17 with support for user-defined data structures, without code generation and without macros, only pure C++ with HTTP/HTTPS transport.   
 
 # Version
-1.0.0  
+1.1.0  
 
 # Features
 - base for client-server applications
@@ -12,7 +12,8 @@ Nano RPC is a lightweight RPC in C++ 17 with support for user-defined data struc
 - NO code generation
 - you can use types from stl, such as vector, list, set, map, string, etc. and similar types from the boost library
 - customization for serialization and transtorpt and easy interface for beginners
-- HTTP transport based on boost.asio and boost.beast  
+- the build in the pure mode for usage with your own transport (without boost)  
+- HTTP/HTTPS transport based on boost.asio and boost.beast  
 
 **NOTE**  
 Currently, C++ reflection is not supported out of the box, so this library has some restrictions in using types for function parameters and for return values.  
@@ -36,34 +37,54 @@ The code is a cross-platform. Perhaps you will be able to compile under another 
 - Boost only  
 
 # Build and install
+## Build with installed Boost  
 ```bash
 git clone https://github.com/tdv/nanorpc.git  
 cd nanorpc  
-./download_third_party.sh  
 mkdir build  
 cd build  
 cmake ..  
 make  
 make install  
 ```
-
 You can try using CMAKE_INSTALL_PREFIX to select the installation directory  
 
+## Build without installed Boost  
+```bash
+git clone https://github.com/tdv/nanorpc.git  
+cd nanorpc  
+./build_with_boost.sh
+```
+
 **NOTE**  
-If you have installed boost 1.67 or later  in your system, you can build library without running download_third_party.sh  
+NanoRPC has two build options  
+- with SSL  
+- pure core only  
+
+Use cmake -D with NANORPC_WITH_SSL or NANORPC_PURE_CORE. You can't enable both options at the same time.  
+The 'pure core' build you can use with your own transport.  
 
 ## Build examples
+### Build examples with installed boost and nanorpc
 ```bash
-cd nanorpc/examples/{sample_project}
+cd nanorpc/examples/{example_project}
 mkdir build  
 cd build  
 cmake ..  
 make  
 ```
+### Build examples without installed boost and nanorpc
+```bash
+cd nanorpc/examples/{example_project}
+mkdir build  
+cd build  
+cmake -DBOOST_ROOT=$PWD/../../../third_party/boost -Dnanorpc_DIR=$PWD/../../../target/nanorpc ..
+make  
+```
 
 # Examples
 
-## RPC. Hello World
+## Hello World
 [Source code](https://github.com/tdv/nanorpc/tree/master/examples/hello_world)  
 **Description**  
 The "Hello World" example demonstrates a basic client-server application with RPC and HTTP communication.  
@@ -329,3 +350,75 @@ int main()
 }
 
 ```
+
+## Pure Core
+[Source code](https://github.com/tdv/nanorpc/tree/master/examples/pure_core)  
+**Description**  
+The "Pure Core" example demonstrates a basic client-server application with RPC and in-memory (in one process) communication. In this example 'executor' is a transport stub and you can rewrite it with your own transport implementation.  
+
+**Application**  
+```cpp
+// STD
+#include <cstdlib>
+#include <iostream>
+
+// NANORPC
+#include <nanorpc/core/client.h>
+#include <nanorpc/core/exception.h>
+#include <nanorpc/core/server.h>
+#include <nanorpc/packer/plain_text.h>
+
+int main()
+{
+    try
+    {
+        nanorpc::core::server<nanorpc::packer::plain_text> server;
+        server.handle("test", [] (std::string const &s)
+            {
+                std::cout << "Server. Method \"test\". Input: " << s << std::endl;
+                return "echo \"" + s + "\"";
+            } );
+
+        auto executor = [srv = std::move(server)]
+            (nanorpc::core::type::buffer request) mutable
+            {
+                std::cout << "Dump. Request: '"
+                          << std::string{begin(request), end(request)}
+                          << "'" << std::endl;
+
+                auto response = srv.execute(std::move(request));
+
+                std::cout << "Dump. Response: '"
+                          << std::string{begin(response), end(response)}
+                          << "'" << std::endl;
+
+                return response;
+            };
+
+        nanorpc::core::client<nanorpc::packer::plain_text> client{std::move(executor)};
+
+        std::string response = client.call("test", "hello world !!!");
+        std::cout << "Client. Method \"test\" Output: " << response << std::endl;
+    }
+    catch (std::exception const &e)
+    {
+        std::cerr << "Error: " << nanorpc::core::exception::to_string(e) << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+```
+
+## SSL Hello World
+[Source code](https://github.com/tdv/nanorpc/tree/master/examples/ssl_hello_world)  
+**Description**  
+The "SSL Hello World" example demonstrates a basic client-server application with RPC and HTTPS communication. The example similar to 'Hello World' example with HTTPS transport. The example must be executed with certificate files. For test you can generate your own certificates  
+```bash
+cd examples/ssl_hello_world/bin
+openssl dhparam -out dh.pem 2048
+openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 10000 -out cert.pem \
+    -subj "//C=US\ST=CA\L=Los Angeles\O=Beast\CN=www.example.com"
+```
+In this example you should run the client and server applications from the folder with certificates.  

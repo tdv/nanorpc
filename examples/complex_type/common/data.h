@@ -1,3 +1,10 @@
+//-------------------------------------------------------------------
+//  Nano RPC
+//  https://github.com/tdv/nanorpc
+//  Created:     05.2018
+//  Copyright (C) 2018 tdv
+//-------------------------------------------------------------------
+
 #ifndef __EXAMPLES_COMPLEX_TYPE_DATA_H__
 #define __EXAMPLES_COMPLEX_TYPE_DATA_H__
 

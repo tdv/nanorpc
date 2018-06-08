@@ -12,14 +12,21 @@
 #include <tuple>
 #include <type_traits>
 
+// NANORPC
+#include "nanorpc/core/detail/config.h"
+#include "nanorpc/packer/detail/traits.h"
+
+#ifndef NANORPC_PURE_CORE
+
 // BOOST
 #include <boost/preprocessor.hpp>
 
-// NANORPC
-#include "nanorpc/packer/detail/traits.h"
+#endif  // !NANORPC_PURE_CORE
 
 namespace nanorpc::packer::detail
 {
+
+#ifndef NANORPC_PURE_CORE
 
 template <typename T>
 auto to_tuple(T &&value)
@@ -57,6 +64,71 @@ auto to_tuple(T &&value)
 #undef NANORPC_TO_TUPLE_DUMMY_TYPE_N
 #undef NANORPC_TO_TUPLE_LIMIT_FIELDS
 }
+
+#else
+
+template <typename T>
+auto to_tuple(T &&value)
+{
+    using type = std::decay_t<T>;
+
+    if constexpr (is_braces_constructible_v<type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type>)
+    {
+        auto &&[f1, f2, f3, f4, f5, f6, f7, f8, f9, f10] = value;
+        return std::make_tuple(f1, f2, f3, f4, f5, f6, f7, f8, f9, f10);
+    }
+    else if constexpr (is_braces_constructible_v<type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type>)
+    {
+        auto &&[f1, f2, f3, f4, f5, f6, f7, f8, f9] = value;
+        return std::make_tuple(f1, f2, f3, f4, f5, f6, f7, f8, f9);
+    }
+    else if constexpr (is_braces_constructible_v<type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type>)
+    {
+        auto &&[f1, f2, f3, f4, f5, f6, f7, f8] = value;
+        return std::make_tuple(f1, f2, f3, f4, f5, f6, f7, f8);
+    }
+    else if constexpr (is_braces_constructible_v<type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type>)
+    {
+        auto &&[f1, f2, f3, f4, f5, f6, f7] = value;
+        return std::make_tuple(f1, f2, f3, f4, f5, f6, f7);
+    }
+    else if constexpr (is_braces_constructible_v<type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type>)
+    {
+        auto &&[f1, f2, f3, f4, f5, f6] = value;
+        return std::make_tuple(f1, f2, f3, f4, f5, f6);
+    }
+    else if constexpr (is_braces_constructible_v<type, dummy_type, dummy_type, dummy_type, dummy_type, dummy_type>)
+    {
+        auto &&[f1, f2, f3, f4, f5] = value;
+        return std::make_tuple(f1, f2, f3, f4, f5);
+    }
+    else if constexpr (is_braces_constructible_v<type, dummy_type, dummy_type, dummy_type, dummy_type>)
+    {
+        auto &&[f1, f2, f3, f4] = value;
+        return std::make_tuple(f1, f2, f3, f4);
+    }
+    else if constexpr (is_braces_constructible_v<type, dummy_type, dummy_type, dummy_type>)
+    {
+        auto &&[f1, f2, f3] = value;
+        return std::make_tuple(f1, f2, f3);
+    }
+    else if constexpr (is_braces_constructible_v<type, dummy_type, dummy_type>)
+    {
+        auto &&[f1, f2] = value;
+        return std::make_tuple(f1, f2);
+    }
+    else if constexpr (is_braces_constructible_v<type, dummy_type>)
+    {
+        auto &&[f1] = value;
+        return std::make_tuple(f1);
+    }
+    else
+    {
+        return std::make_tuple();
+    }
+}
+
+#endif  // !NANORPC_PURE_CORE
 
 }   // namespace nanorpc::packer::detail
 

@@ -414,7 +414,7 @@ int main()
 ## SSL Hello World
 [Source code](https://github.com/tdv/nanorpc/tree/master/examples/ssl_hello_world)  
 **Description**  
-The "SSL Hello World" example demonstrates a basic client-server application with RPC and HTTPS communication. The example similar as 'Hello World' example with HTTPS transport. The example must be executed with certificate files. For test you can generate your own certificates  
+The "SSL Hello World" example demonstrates a basic client-server application with RPC and HTTPS communication. The example similar to 'Hello World' example with HTTPS transport. The example must be executed with certificate files. For test you can generate your own certificates  
 ```bash
 cd examples/ssl_hello_world/bin
 openssl dhparam -out dh.pem 2048

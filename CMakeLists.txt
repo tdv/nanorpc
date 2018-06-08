@@ -1,16 +1,12 @@
 cmake_minimum_required(VERSION 3.0.2)
 
-include(ExternalProject)
-
 #-----------------------Options--------------------------------------
 option (NANORPC_WITH_SSL "[NANORPC] Support working with SSL" ON)
 option (NANORPC_PURE_CORE "[NANORPC] Only pure core" OFF)
 #--------------------------------------------------------------------
 
 #-----------------------Version--------------------------------------
-set (NANORPC_VERSION_MAJOR 1)
-set (NANORPC_VERSION_MINOR 1)
-set (NANORPC_VERSION_PATCH 0)
+include(cmake/version.cmake)
 #--------------------------------------------------------------------
 
 project(nanorpc)
@@ -54,18 +50,14 @@ set (LIBRARIES "")
 #------------------------ Boost --------------------------
 if (NOT NANORPC_PURE_CORE)
 
-    find_package(Boost 1.66.0)
+    find_package(Boost 1.66.0 REQUIRED)
+    include_directories(${Boost_INCLUDE_DIRS})
+    link_directories(${Boost_LIBRARY_DIRS})
 
-    if (Boost_FOUND)
-        set (LIBRARIES
-            ${LIBRARIES}
-            ${Boost_LIBRARIES}
-        )
-        include_directories(${Boost_INCLUDE_DIRS})
-        link_directories(${Boost_LIBRARY_DIRS})
-    else()
-        message(FATAL_ERROR "Boost version 1.66 or later not found.")
-    endif()
+    set (LIBRARIES
+        ${LIBRARIES}
+        ${Boost_LIBRARIES}
+    )
 
 endif()
 #---------------------------------------------------------
@@ -94,6 +86,22 @@ set(LIBRARIES
 
 include_directories (include)
 include_directories (${HEADERS})
+
+set (INCLUDE_INSTALL_DIR ${PROJECT_LC}/include)
+set (LIBS_INSTALL_DIR ${PROJECT_LC}/lib)
+set (LIB_INSTALL_DIR lib)
+
+include(CMakePackageConfigHelpers)
+
+configure_package_config_file(cmake/config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_LC}-config.cmake
+    INSTALL_DESTINATION ${LIB_INSTALL_DIR}
+    PATH_VARS INCLUDE_INSTALL_DIR LIBS_INSTALL_DIR
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_LC}-config.cmake
+    DESTINATION ${LIB_INSTALL_DIR}/../
+)
 
 if (NOT NANORPC_PURE_CORE)
     add_library (${PROJECT_LC} STATIC ${SOURCES})

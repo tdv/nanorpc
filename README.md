@@ -1,8 +1,8 @@
 # nanorpc - lightweight RPC in pure C++ 17
-Nano RPC is a lightweight RPC in C++ 17 with support for user-defined data structures, without code generation and without macros, only pure C++ with HTTP transport. If you need SSL, you can use nginx as frontend. Nano RPC is a very light library.  
+Nano RPC is a lightweight RPC in C++ 17 with support for user-defined data structures, without code generation and without macros, only pure C++ with HTTP/HTTPS transport.   
 
 # Version
-1.0.0  
+1.1.0  
 
 # Features
 - base for client-server applications
@@ -12,7 +12,7 @@ Nano RPC is a lightweight RPC in C++ 17 with support for user-defined data struc
 - NO code generation
 - you can use types from stl, such as vector, list, set, map, string, etc. and similar types from the boost library
 - customization for serialization and transtorpt and easy interface for beginners
-- HTTP transport based on boost.asio and boost.beast  
+- HTTP/HTTPS transport based on boost.asio and boost.beast  
 
 **NOTE**  
 Currently, C++ reflection is not supported out of the box, so this library has some restrictions in using types for function parameters and for return values.  

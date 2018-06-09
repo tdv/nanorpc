@@ -422,3 +422,68 @@ openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 10000 -out cert.
     -subj "//C=US\ST=CA\L=Los Angeles\O=Beast\CN=www.example.com"
 ```
 In this example you should run the client and server applications from the folder with certificates.  
+
+# Benchmark with ab utility
+- create a file with the request data dump (request.txt)  
+- run the hello_world_server sample
+- run ab utility with request.txt  
+
+**Create dump (request.txt)**  
+```bash
+echo '1 1 15118982290295364091 "test"  ' >request.txt
+```
+
+**Run ab utility**  
+```bash
+ab -c 1000 -n 1000000 -r -k -p request.txt "http://localhost:55555/api/"
+```
+
+**Results**  
+```bash
+Server Software:        NanoRPC
+Server Hostname:        localhost
+Server Port:            55555
+
+Document Path:          /api/
+Document Length:        21 bytes
+
+Concurrency Level:      1000
+Time taken for tests:   29.444 seconds
+Complete requests:      1000000
+Failed requests:        0
+Keep-Alive requests:    1000000
+Total transferred:      134000000 bytes
+Total body sent:        192000000
+HTML transferred:       21000000 bytes
+Requests per second:    33962.98 [#/sec] (mean)
+Time per request:       29.444 [ms] (mean)
+Time per request:       0.029 [ms] (mean, across all concurrent requests)
+Transfer rate:          4444.37 [Kbytes/sec] received
+                        6368.06 kb/s sent
+                        10812.43 kb/s total
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.9      0      44
+Processing:     0   29  15.0     28     227
+Waiting:        0   29  15.0     28     227
+Total:          0   29  15.0     28     240
+
+Percentage of the requests served within a certain time (ms)
+  50%     28
+  66%     33
+  75%     36
+  80%     39
+  90%     48
+  95%     57
+  98%     67
+  99%     75
+ 100%    240 (longest request)
+```
+
+
+Take a look on the following line from the above results  
+```bash
+Requests per second:    33962.98 [#/sec] (mean)
+```
+I think this is a good result of using nanorpc with a simple HTTP server based on boost.  

@@ -1,5 +1,6 @@
 # nanorpc - lightweight RPC in pure C++ 17
-Nano RPC is a lightweight RPC in C++ 17 with support for user-defined data structures, without code generation and without macros, only pure C++ with HTTP/HTTPS transport.   
+Nano RPC is a lightweight RPC in C++ 17 with support for user-defined data structures, 
+without code generation and without macros, only pure C++ with HTTP/HTTPS transport.   
 
 # Version
 1.1.0  
@@ -10,37 +11,40 @@ Nano RPC is a lightweight RPC in C++ 17 with support for user-defined data struc
 - support for nested structures
 - NO macros
 - NO code generation
-- you can use types from stl, such as vector, list, set, map, string, etc. and similar types from the boost library
-- customization for serialization and transtorpt and easy interface for beginners
+- you can use types from STL, such as vector, list, set, map, string, etc. and similar types from the boost library
+- customization for serialization and transport and easy interface for beginners
 - the build in the pure mode for usage with your own transport (without boost)  
 - HTTP/HTTPS transport based on boost.asio and boost.beast  
 
 **NOTE**  
-Currently, C++ reflection is not supported out of the box, so this library has some restrictions in using types for function parameters and for return values.  
+Currently, C++ reflection is not supported out of the box, 
+so this library has some restrictions in using types for function parameters and return values.  
 
 ## Restrictions
 - user-defined data structures should not have a user-defined constructor
 - no inheritance
-- you can't use arbitrary types from stl and boost
+- you can't use arbitrary types from STL and boost
 - you can't use raw pointers and non-const references  
 
 # Compiler
 The minimum compiler version required is gcc 7.3 (other compilers were not tested)  
 
 # OS
-Linux (Tested on Ubuntu 16.04)  
+Linux (Tested on Ubuntu 16.04 and Ubuntu 18.04)
 
 **NOTE**  
-The code is a cross-platform. Perhaps you will be able to compile under another OS with another compiler, with your own modifications for a build script.  
+The code is cross-platform. Perhaps you will be able to compile under another OS with another compiler, 
+with your own modifications for a build script.  
 
 # Dependencies
 - Boost only  
 
 # Build and install
-## Build with installed Boost  
+
+## Clone and build with installed Boost  
 ```bash
 git clone https://github.com/tdv/nanorpc.git  
-cd nanorpc  
+cd nanorpc
 mkdir build  
 cd build  
 cmake ..  
@@ -49,10 +53,10 @@ make install
 ```
 You can try using CMAKE_INSTALL_PREFIX to select the installation directory  
 
-## Build without installed Boost  
+## Clone and build without installed Boost  
 ```bash
 git clone https://github.com/tdv/nanorpc.git  
-cd nanorpc  
+cd nanorpc
 ./build_with_boost.sh
 ```
 
@@ -67,7 +71,7 @@ The 'pure core' build you can use with your own transport.
 ## Build examples
 ### Build examples with installed boost and nanorpc
 ```bash
-cd nanorpc/examples/{example_project}
+cd examples/{example_project}
 mkdir build  
 cd build  
 cmake ..  
@@ -75,7 +79,7 @@ make
 ```
 ### Build examples without installed boost and nanorpc
 ```bash
-cd nanorpc/examples/{example_project}
+cd examples/{example_project}
 mkdir build  
 cd build  
 cmake -DBOOST_ROOT=$PWD/../../../third_party/boost -Dnanorpc_DIR=$PWD/../../../target/nanorpc ..
@@ -151,7 +155,10 @@ int main()
 ## Complex Type
 [Source code](https://github.com/tdv/nanorpc/tree/master/examples/complex_type)  
 **Description**  
-This example is the same as "Hello World". The difference is in calling remote methods with user-defined data structures as parameters and returning a value. The project structure is the same as in the previous project example, we only add the definition of user-defined data structures.  
+This example is the same as "Hello World". 
+The difference is in calling remote methods with user-defined data structures as parameters and returning a value. 
+The project structure is the same as in the previous example, 
+only the definitions of the user-defined data structures were added.  
 
 **Common data**  
 ```cpp
@@ -354,7 +361,8 @@ int main()
 ## Pure Core
 [Source code](https://github.com/tdv/nanorpc/tree/master/examples/pure_core)  
 **Description**  
-The "Pure Core" example demonstrates a basic client-server application with RPC and in-memory (in one process) communication. In this example 'executor' is a transport stub and you can rewrite it with your own transport implementation.  
+The "Pure Core" example demonstrates a basic client-server application with RPC and in-memory (in one process) communication. 
+In this example 'executor' is a transport stub and you can rewrite it with your own transport implementation.  
 
 **Application**  
 ```cpp
@@ -414,7 +422,9 @@ int main()
 ## SSL Hello World
 [Source code](https://github.com/tdv/nanorpc/tree/master/examples/ssl_hello_world)  
 **Description**  
-The "SSL Hello World" example demonstrates a basic client-server application with RPC and HTTPS communication. The example similar to 'Hello World' example with HTTPS transport. The example must be executed with certificate files. For test you can generate your own certificates  
+The "SSL Hello World" example demonstrates a basic client-server application with RPC and HTTPS communication. 
+The example is similar to 'Hello World' example with HTTPS transport. 
+The example must be executed with certificate files. For test you can generate your own certificates  
 ```bash
 cd examples/ssl_hello_world/bin
 openssl dhparam -out dh.pem 2048

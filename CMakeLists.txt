@@ -50,7 +50,7 @@ set (LIBRARIES "")
 #------------------------ Boost --------------------------
 if (NOT NANORPC_PURE_CORE)
 
-    find_package(Boost 1.66.0 REQUIRED)
+    find_package(Boost 1.67.0 REQUIRED)
     include_directories(${Boost_INCLUDE_DIRS})
     link_directories(${Boost_LIBRARY_DIRS})
 

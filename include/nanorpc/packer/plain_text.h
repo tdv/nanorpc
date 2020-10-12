@@ -146,7 +146,7 @@ private:
         {
             using value_type = std::decay_t<T>;
             if constexpr (std::is_same_v<value_type, char> || std::is_same_v<value_type, unsigned char>)
-                *stream_ << std::hex << static_cast<std::uint16_t>(value) << ' ';
+                *stream_ << std::hex << static_cast<std::uint16_t>(value) << std::dec << ' ';
             else
                 *stream_ << value << ' ';
         }
@@ -292,7 +292,7 @@ private:
             if constexpr (std::is_same_v<value_type, char> || std::is_same_v<value_type, unsigned char>)
             {
                 std::uint16_t tmp = 0;
-                *stream_ >> std::hex >> tmp;
+                *stream_ >> std::hex >> tmp >> std::dec;
                 value = static_cast<value_type>(tmp);
             }
             else

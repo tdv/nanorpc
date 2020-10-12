@@ -144,7 +144,11 @@ private:
         std::enable_if_t<is_serializable_v<T> && !std::is_same_v<std::decay_t<T>, std::string>, void>
         pack_value(T const &value)
         {
-            *stream_ << value << ' ';
+            using value_type = std::decay_t<T>;
+            if constexpr (std::is_same_v<value_type, char> || std::is_same_v<value_type, unsigned char>)
+                *stream_ << std::hex << static_cast<std::uint16_t>(value) << ' ';
+            else
+                *stream_ << value << ' ';
         }
 
         template <typename T>
@@ -284,7 +288,17 @@ private:
         std::enable_if_t<is_deserializable_v<T> && !std::is_same_v<T, std::string>, void>
         unpack_value(T &value)
         {
-            *stream_ >> value;
+            using value_type = std::decay_t<T>;
+            if constexpr (std::is_same_v<value_type, char> || std::is_same_v<value_type, unsigned char>)
+            {
+                std::uint16_t tmp = 0;
+                *stream_ >> std::hex >> tmp;
+                value = static_cast<value_type>(tmp);
+            }
+            else
+            {
+                *stream_ >> value;
+            }
         }
 
         template <typename T>

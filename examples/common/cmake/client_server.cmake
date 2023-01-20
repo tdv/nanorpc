@@ -17,16 +17,27 @@ set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 #---------------------- Dependencies ---------------------
 
-find_package(Boost 1.66.0 REQUIRED)
+if (NOT DEFINED BOOST_ROOT)
+    find_package(Boost 1.67.0 REQUIRED)
+    if (NOT DEFINED Boost_FOUND)
+        message(FATAL_ERROR "Boost_INCLUDE_DIRS is not found.")
+    endif()
+else()
+    set(Boost_INCLUDE_DIRS "${BOOST_ROOT}include")
+    set(Boost_LIBRARY_DIRS "${BOOST_ROOT}lib")
+endif()
+
 include_directories(${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
+
+add_definitions(-DBOOST_ERROR_CODE_HEADER_ONLY)
 
 set (Boost_LIBRARIES
     ${Boost_LIBRARIES}
     boost_iostreams
     boost_date_time
-    boost_system
     boost_thread
+    boost_system
 )
 
 

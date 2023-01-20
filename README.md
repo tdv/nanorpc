@@ -3,7 +3,7 @@ Nano RPC is a lightweight RPC in C++ 17 with support for user-defined data struc
 without code generation and without macros, only pure C++ with HTTP/HTTPS transport.   
 
 # Version
-1.1.0  
+1.1.1  
 
 # Features
 - base for client-server applications

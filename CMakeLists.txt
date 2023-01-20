@@ -50,7 +50,18 @@ set (LIBRARIES "")
 #------------------------ Boost --------------------------
 if (NOT NANORPC_PURE_CORE)
 
-    find_package(Boost 1.67.0 REQUIRED)
+    if (NOT DEFINED BOOST_ROOT)
+        find_package(Boost 1.67.0 REQUIRED)
+        if (NOT DEFINED Boost_FOUND)
+            message(FATAL_ERROR "Boost_INCLUDE_DIRS is not found.")
+        endif()
+    else()
+        set(Boost_INCLUDE_DIRS "${BOOST_ROOT}include")
+        set(Boost_LIBRARY_DIRS "${BOOST_ROOT}lib")
+    endif()
+
+    add_definitions(-DBOOST_ERROR_CODE_HEADER_ONLY)
+
     include_directories(${Boost_INCLUDE_DIRS})
     link_directories(${Boost_LIBRARY_DIRS})
 

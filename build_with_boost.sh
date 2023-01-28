@@ -1,12 +1,16 @@
 WORKING_DIR=$PWD
 BOOST_DIR=$WORKING_DIR/third_party/boost/
+BOOST_VER=1.69.0
+BOOST_VER_=$(echo $BOOST_VER | tr . _)
+echo $BOOST_VER $BOOST_VER_
+
 
 mkdir third_party
 cd third_party
 
-wget https://boostorg.jfrog.io/artifactory/main/release/1.67.0/source/boost_1_67_0.tar.gz
-tar zxvf boost_1_67_0.tar.gz
-mv boost_1_67_0 boost_sources
+wget https://boostorg.jfrog.io/artifactory/main/release/$BOOST_VER/source/boost_$BOOST_VER_.tar.gz
+tar zxvf boost_$BOOST_VER_.tar.gz
+mv boost_$BOOST_VER_ boost_sources
 cd boost_sources
 
 ./bootstrap.sh --prefix=$BOOST_DIR \
